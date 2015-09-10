@@ -246,6 +246,9 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 			var waiting = self.servers.length;
 
 			function loop(err, response) {
+				if (err) {
+					console.log(err.message);
+				}
 				if (response) votes++;
 				if (waiting-- > 1) return;
 
