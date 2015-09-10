@@ -1,6 +1,6 @@
 'use strict';
 
-var util    = require('util');
+var util = require('util');
 var Promise = require('bluebird');
 
 // constants
@@ -10,11 +10,9 @@ var extendScript = 'if redis.call("get", KEYS[1]) == ARGV[1] then return redis.c
 // defaults
 var defaults = {
 	driftFactor: 0.01,
-	retryCount:  3,
-	retryDelay:  200
+	retryCount: 3,
+	retryDelay: 200
 };
-
-
 
 
 
@@ -32,18 +30,15 @@ util.inherits(LockError, Error);
 
 
 
-
-
-
 // Lock
 // ----
 // An object of this type is returned when a resource is successfully locked. It contains
 // convenience methods `unlock` and `extend` which perform the associated Redlock method on
 // itself.
 function Lock(redlock, resource, value, expiration) {
-	this.redlock    = redlock;
-	this.resource   = resource;
-	this.value      = value;
+	this.redlock = redlock;
+	this.resource = resource;
+	this.value = value;
 	this.expiration = expiration;
 }
 
@@ -57,9 +52,6 @@ Lock.prototype.extend = function extend(ttl, callback) {
 
 
 
-
-
-
 // Redlock
 // -------
 // A redlock object is instantiated with an array of at least one redis client and an optional
@@ -69,12 +61,12 @@ function Redlock(clients, options) {
 	// set default options
 	options = options || {};
 	this.driftFactor = typeof options.driftFactor === 'number' ? options.driftFactor : defaults.driftFactor;
-	this.retryCount  = typeof options.retryCount  === 'number' ? options.retryCount  : defaults.retryCount;
-	this.retryDelay  = typeof options.retryDelay  === 'number' ? options.retryDelay  : defaults.retryDelay;
-	
+	this.retryCount = typeof options.retryCount === 'number' ? options.retryCount : defaults.retryCount;
+	this.retryDelay = typeof options.retryDelay === 'number' ? options.retryDelay : defaults.retryDelay;
+
 	// set the redis servers from additional arguments
 	this.servers = clients;
-	if(this.servers.length === 0)
+	if (this.servers.length === 0)
 		throw new Error('Redlock must be instantiated with at least one redis server.');
 }
 
@@ -97,9 +89,9 @@ Redlock.LockError = LockError;
 // )
 // ```
 Redlock.prototype.acquire =
-Redlock.prototype.lock = function lock(resource, ttl, callback) {
-	return this._lock(resource, null, ttl, callback);
-};
+	Redlock.prototype.lock = function lock(resource, ttl, callback) {
+		return this._lock(resource, null, ttl, callback);
+	};
 
 // lock
 // ----
@@ -118,7 +110,9 @@ Redlock.prototype.lock = function lock(resource, ttl, callback) {
 // );
 // ```
 Redlock.prototype.disposer = function disposer(resource, ttl) {
-	return this._lock(resource, null, ttl).disposer(function(lock){ return lock.unlock(); });
+	return this._lock(resource, null, ttl).disposer(function(lock) {
+		return lock.unlock();
+	});
 };
 
 
@@ -127,35 +121,35 @@ Redlock.prototype.disposer = function disposer(resource, ttl) {
 // This method unlocks the provided lock from all servers still persisting it. This is a
 // best-effort attempt and as such fails silently.
 Redlock.prototype.release =
-Redlock.prototype.unlock = function unlock(lock, callback) {
-	var self = this;
-	return new Promise(function(resolve, reject) {
+	Redlock.prototype.unlock = function unlock(lock, callback) {
+		var self = this;
+		return new Promise(function(resolve, reject) {
 
-		// the lock has expired
-		if(lock.expiration < Date.now()) {
-			return resolve();
-		}
+			// the lock has expired
+			if (lock.expiration < Date.now()) {
+				return resolve();
+			}
 
-		// invalidate the lock
-		lock.expiration = 0;
+			// invalidate the lock
+			lock.expiration = 0;
 
-		// the number of async redis calls still waiting to finish
-		var waiting = self.servers.length;
+			// the number of async redis calls still waiting to finish
+			var waiting = self.servers.length;
 
-		// release the lock on each server
-		self.servers.forEach(function(server){
-			server.eval(unlockScript, 1, lock.resource, lock.value, loop);
-		});
+			// release the lock on each server
+			self.servers.forEach(function(server) {
+				server.eval(unlockScript, 1, lock.resource, lock.value, loop);
+			});
 
-		function loop(err, response) {
-			if(waiting-- > 1) return;
-			return resolve();
-		}
-	})
+			function loop(err, response) {
+				if (waiting-- > 1) return;
+				return resolve();
+			}
+		})
 
-	// optionally run callback
-	.nodeify(callback);
-};
+		// optionally run callback
+		.nodeify(callback);
+	};
 
 
 // extend
@@ -165,15 +159,15 @@ Redlock.prototype.extend = function extend(lock, ttl, callback) {
 	var self = this;
 
 	// the lock has expired
-	if(lock.expiration < Date.now())
+	if (lock.expiration < Date.now())
 		return Promise.reject(new LockError('Cannot extend lock on resource "' + lock.resource + '" because the lock has already expired.')).nodeify(callback);
 
 	// extend the lock
 	return self._lock(lock.resource, lock.value, ttl)
 
 	// modify and return the original lock object
-	.then(function(extension){
-		lock.value      = extension.value;
+	.then(function(extension) {
+		lock.value = extension.value;
 		lock.expiration = extension.expiration;
 		return lock;
 	})
@@ -215,28 +209,28 @@ Redlock.prototype.extend = function extend(lock, ttl, callback) {
 Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 	var self = this;
 	return new Promise(function(resolve, reject) {
-		var request; 
+		var request;
 
 		// the number of times we have attempted this lock
 		var attempts = 0;
 
 
 		// create a new lock
-		if(value === null) {
+		if (value === null) {
 			value = self._random();
-			request = function(server, loop){
+			request = function(server, loop) {
 				return server.set(resource, value, 'NX', 'PX', ttl, loop);
 			};
 		}
 
 		// extend an existing lock
 		else {
-			request = function(server, loop){
+			request = function(server, loop) {
 				return server.eval(extendScript, 1, resource, value, ttl, loop);
 			};
 		}
 
-		function attempt(){
+		function attempt() {
 			attempts++;
 
 			// the time when this attempt started
@@ -252,8 +246,8 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 			var waiting = self.servers.length;
 
 			function loop(err, response) {
-				if(response) votes++;
-				if(waiting-- > 1) return;
+				if (response) votes++;
+				if (waiting-- > 1) return;
 
 				// Add 2 milliseconds to the drift to account for Redis expires precision, which is 1 ms,
 				// plus the configured allowable drift factor
@@ -261,15 +255,15 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 				var lock = new Lock(self, resource, value, start + ttl - drift);
 
 				// SUCCESS: there is concensus and the lock is not expired
-				if(votes >= quorum && lock.expiration > Date.now())
+				if (votes >= quorum && lock.expiration > Date.now())
 					return resolve(lock);
 
-
+				console.log('Lock attempt: (votes: %d, quorum: %d)', votes, quorum);
 				// remove this lock from servers that voted for it
-				return lock.unlock(function(){
+				return lock.unlock(function() {
 
 					// RETRY
-					if(attempts <= self.retryCount)
+					if (attempts <= self.retryCount)
 						return setTimeout(attempt, self.retryDelay);
 
 					// FAILED
@@ -277,7 +271,7 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 				});
 			}
 
-			return self.servers.forEach(function(server){
+			return self.servers.forEach(function(server) {
 				return request(server, loop);
 			});
 		}
@@ -290,7 +284,7 @@ Redlock.prototype._lock = function _lock(resource, value, ttl, callback) {
 };
 
 
-Redlock.prototype._random = function _random(){
+Redlock.prototype._random = function _random() {
 	return Math.random().toString(36).slice(2);
 };
 
